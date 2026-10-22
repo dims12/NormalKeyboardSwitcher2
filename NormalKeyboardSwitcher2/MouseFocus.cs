@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Threading;
 namespace NormalKeyboardSwitcher2;
@@ -9,7 +10,7 @@ internal sealed class MouseFocus : IDisposable
     { public Native.Point Point; public uint Data,Flags,Time; public nuint Extra; }
     [DllImport("user32.dll")] private static extern nint GetAncestor(nint window,uint flags);
     private readonly Native.Hook callback;
-    private readonly nint hook;
+    private nint hook;
     private ClickedEditor? clicked;
     internal MouseFocus(Action wake)
     {
@@ -30,6 +31,7 @@ internal sealed class MouseFocus : IDisposable
             return Native.CallNextHookEx(hook,code,message,data);
         };
         hook=Native.SetWindowsHookEx(14,callback,Native.GetModuleHandle(null),0);
+        if(hook==0) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
     internal ClickedEditor? Read(nint foreground)
     {
@@ -37,5 +39,10 @@ internal sealed class MouseFocus : IDisposable
         return value?.Foreground==foreground ? value:null;
     }
     internal void Clear() => Volatile.Write(ref clicked,null);
-    public void Dispose() { if(hook!=0) Native.UnhookWindowsHookEx(hook); }
+    public void Dispose()
+    {
+        if(hook!=0) Native.UnhookWindowsHookEx(hook);
+        hook=0;
+        Clear();
+    }
 }

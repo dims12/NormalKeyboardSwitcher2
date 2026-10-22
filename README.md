@@ -48,6 +48,7 @@ OK saves the dropdown and indicator settings and closes the window. Cancel (or t
 - Switching keeps the entire keyboard-layout handle, preserving layout variants.
 - The app requests a change from the focused window and checks the reported result. A rejected or timed-out switch is not committed as successful.
 - Switching focus during a gesture cancels the cycle. External language changes update recent ordering.
+- Locking or disconnecting the Windows session cancels the gesture and stops caret tracking. Unlocking or reconnecting clears held-key state, reinstalls keyboard and mouse hooks, and starts a fresh accessibility worker and event subscriptions (including Calc tracking).
 - History is shared across applications for this running session; it is not persisted across restarts. The app does not force a language onto every newly focused window.
 
 ## Automatic Windows shortcut management

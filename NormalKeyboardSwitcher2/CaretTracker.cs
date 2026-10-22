@@ -13,17 +13,28 @@ internal sealed class CaretTracker : IDisposable
     private readonly MouseFocus mouse;
     internal void ClearPointerFocus() => mouse.Clear();
     private volatile bool stopped;
+    private readonly object lifetime=new();
+    private bool workerExited;
     private readonly AutoResetEvent wake=new(false);
     private readonly ConsoleCaretSource console=new();
     private long inputTime;
-    internal void Wake() { Interlocked.Exchange(ref inputTime,Environment.TickCount64); wake.Set(); }
+    internal void Wake()
+    {
+        lock(lifetime)
+        {
+            if(stopped || workerExited) return;
+            Interlocked.Exchange(ref inputTime,Environment.TickCount64);
+            wake.Set();
+        }
+    }
     private CaretSample? sample;
     private string diagnostic="Starting";
     internal string Diagnostic => Volatile.Read(ref diagnostic);
     internal CaretTracker()
     {
         events=new AccessibilityEvents(Wake);
-        mouse=new MouseFocus(Wake);
+        try { mouse=new MouseFocus(Wake); }
+        catch { events.Dispose(); wake.Dispose(); throw; }
         worker = new Thread(Work) { IsBackground = true, Name = "Caret accessibility" };
         worker.SetApartmentState(ApartmentState.MTA);
         worker.Start();
@@ -102,14 +113,18 @@ internal sealed class CaretTracker : IDisposable
                     if(rect==null && foreground!=gui.Focus) rect=TryRead(()=>AccessibleTextCaret.Read(foreground,trace));
                 }
                 Volatile.Write(ref diagnostic,string.Join("; ",trace));
-                if (foreground == Native.GetForegroundWindow() && gui.Focus == Native.Gui().Focus)
+                if (!stopped && foreground == Native.GetForegroundWindow() && gui.Focus == Native.Gui().Focus)
                     Volatile.Write(ref sample, rect is { } r
                         ? new(foreground, gui.Focus, r, Environment.TickCount64, method) : null);
-                wake.WaitOne(Environment.TickCount64-Interlocked.Read(ref inputTime)<500 ? 16 : 40);
+                if (!stopped) wake.WaitOne(Environment.TickCount64-Interlocked.Read(ref inputTime)<500 ? 16 : 40);
             }
         }
         catch (Exception ex) { AppLog.Write("Caret worker: " + ex.Message); }
-        finally { Release(automation); }
+        finally
+        {
+            Release(automation);
+            lock(lifetime) { workerExited=true; wake.Dispose(); }
+        }
     }
     private static PixelRect? AutomationCaret(IAutomation automation,List<string> trace)
     {
@@ -215,7 +230,20 @@ internal sealed class CaretTracker : IDisposable
     {
         if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
     }
-    public void Dispose() { stopped=true; events.Dispose(); mouse.Dispose(); wake.Set(); console.Dispose(); }
+    public void Dispose()
+    {
+        lock(lifetime)
+        {
+            if(stopped) return;
+            stopped=true;
+            if(!workerExited) wake.Set();
+        }
+        events.Dispose(); mouse.Dispose();
+        Volatile.Write(ref sample,null);
+        console.Dispose();
+        // The worker releases its own COM connection and wait handle when any
+        // in-flight provider call returns; do not block the UI waiting for it.
+    }
 }
 
 

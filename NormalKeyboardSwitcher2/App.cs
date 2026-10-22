@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace NormalKeyboardSwitcher2;
 internal sealed class App : Application
@@ -27,6 +28,9 @@ internal sealed class App : Application
     private SettingsWindow? settingsWindow;
     private bool enabled, pending, endRequested;
     private int requestVersion;
+    private int sessionVersion;
+    private bool sessionSuspended, exiting;
+    private long hookRetryAt;
     private nint sessionFocus, lastExternalWindow, lastExternalFocus;
     private uint lastExternalProcess;
     private long lastRefresh, lastStatus;
@@ -157,12 +161,17 @@ internal sealed class App : Application
             badge=new BadgeWindow();
             keyboard=new KeyboardHook();
             keyboard.State.Gesture=settings.Gesture;
-            keyboard.Input += () => { caret.Wake(); };
-            keyboard.FocusNavigation += () => caret.ClearPointerFocus();
+            keyboard.Input += () => { caret?.Wake(); };
+            keyboard.FocusNavigation += () => caret?.ClearPointerFocus();
             keyboard.Action += action => {
                 bool released=keyboard.State.Released;
-                Dispatcher.BeginInvoke(() => HandleGesture(action,released),DispatcherPriority.Input);
+                int version=sessionVersion;
+                Dispatcher.BeginInvoke(() => {
+                    if (version==sessionVersion && !sessionSuspended && !exiting)
+                        HandleGesture(action,released);
+                },DispatcherPriority.Input);
             };
+            SystemEvents.SessionSwitch += OnSessionSwitch;
             using (var iconStream=Application.GetResourceStream(new Uri("pack://application:,,,/Assets/AppIcon.ico")).Stream)
                 appIcon=new System.Drawing.Icon(iconStream,Forms.SystemInformation.SmallIconSize);
             tray=new Forms.NotifyIcon { Icon=appIcon,
@@ -181,8 +190,54 @@ internal sealed class App : Application
         }
         catch (Exception ex) { AppLog.Write(ex.ToString()); MessageBox.Show(ex.Message,"Cannot start NormalKeyboardSwitcher2"); Shutdown(1); }
     }
+    private void OnSessionSwitch(object sender,SessionSwitchEventArgs e)
+    {
+        // SystemEvents uses a separate thread. Hooks and gesture state belong
+        // to the WPF dispatcher, which also pumps the hook's messages.
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+        Dispatcher.BeginInvoke(() => {
+            if (exiting || keyboard == null) return;
+            bool suspend=e.Reason is SessionSwitchReason.SessionLock
+                or SessionSwitchReason.ConsoleDisconnect or SessionSwitchReason.RemoteDisconnect;
+            bool resume=e.Reason is SessionSwitchReason.SessionUnlock
+                or SessionSwitchReason.ConsoleConnect or SessionSwitchReason.RemoteConnect;
+            if (!suspend && !resume) return;
+            sessionVersion++;
+            sessionSuspended=suspend;
+            Cancel();
+            sessionFocus=0;
+            keyboard.Dispose(); // Key-up events on the lock screen can be missed.
+            hookRetryAt=0;
+            badge?.Hide();
+            // Calc needs fresh accessibility events, mouse hooks and a COM worker
+            // after switching desktops, not just a cleared pointer position.
+            caret?.Dispose();
+            caret=null;
+            if (resume) RestoreInputTracking();
+        },DispatcherPriority.Send);
+    }
+    private void RestoreInputTracking()
+    {
+        try
+        {
+            keyboard!.Restart();
+            caret ??= new CaretTracker();
+            hookRetryAt=0;
+            caret?.Wake();
+            switchStatus="Ready";
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            // The interactive desktop may not be ready at the first notification.
+            if (hookRetryAt==0) AppLog.Write("Input tracking recovery: "+ex);
+            hookRetryAt=Environment.TickCount64+1000;
+            switchStatus="Waiting to reconnect keyboard and caret tracking.";
+        }
+    }
     private void Tick()
     {
+        if (sessionSuspended) return;
+        if (hookRetryAt!=0 && Environment.TickCount64>=hookRetryAt) RestoreInputTracking();
         if (Environment.TickCount64-lastRefresh > 3000 && !recent.Cycling)
         {
             recent.Refresh(Native.Layouts()); lastRefresh=Environment.TickCount64;
@@ -349,6 +404,8 @@ internal sealed class App : Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
+        exiting=true;
+        SystemEvents.SessionSwitch -= OnSessionSwitch;
         timer?.Stop(); keyboard?.Dispose(); caret?.Dispose(); badge?.Close();
         if (tray != null) { tray.Visible=false; tray.Dispose(); }
         appIcon?.Dispose();

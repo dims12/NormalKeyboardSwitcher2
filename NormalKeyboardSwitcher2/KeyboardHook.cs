@@ -6,7 +6,7 @@ namespace NormalKeyboardSwitcher2;
 internal sealed class KeyboardHook : IDisposable
 {
     private readonly Native.Hook callback;
-    private readonly nint handle;
+    private nint handle;
     internal GestureState State { get; } = new();
     internal event Action<GestureAction>? Action;
     internal event System.Action? Input;
@@ -14,6 +14,11 @@ internal sealed class KeyboardHook : IDisposable
     internal KeyboardHook()
     {
         callback = OnKey;
+        Restart();
+    }
+    internal void Restart()
+    {
+        Dispose();
         handle = Native.SetWindowsHookEx(13, callback, Native.GetModuleHandle(null), 0);
         if (handle == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
@@ -35,7 +40,12 @@ internal sealed class KeyboardHook : IDisposable
         // is disabled separately, with a recoverable backup.
         return Native.CallNextHookEx(handle, code, msg, data);
     }
-    public void Dispose() => Native.UnhookWindowsHookEx(handle);
+    public void Dispose()
+    {
+        if (handle != 0) Native.UnhookWindowsHookEx(handle);
+        handle = 0;
+        State.Reset();
+    }
 }
 
 

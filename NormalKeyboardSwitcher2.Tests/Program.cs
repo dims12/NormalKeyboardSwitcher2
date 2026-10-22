@@ -136,6 +136,22 @@ uint[] redCaret={0x0000FF,0x0000FF,0x0000FF,0x0000FF,0x0000FF};
 Check(CaretInkPolicy.HasStroke(new[]{redCaret},white) && CaretInkPolicy.Choose(new[]{redCaret},white)==0x0000FF,"genuine red caret is still preserved");
 uint[] interruptedCaret={0,0,0x0000FF,0,0};
 Check(CaretInkPolicy.HasStroke(new[]{interruptedCaret},white) && CaretInkPolicy.Choose(new[]{interruptedCaret},white)==0,"caret tolerates a small underline intersection");
+foreach(var gesture in new[]{Gesture.CtrlShift,Gesture.AltShift})
+{
+    var locked=new GestureState { Gesture=gesture };
+    int modifier=gesture==Gesture.CtrlShift ? 0xA2 : 0xA4;
+    // Win+L key-up events may occur on the secure desktop and never reach us.
+    locked.Feed(0x5B,true); locked.Feed(0x4C,true);
+    locked.Feed(modifier,true); locked.Feed(0xA0,true);
+    Check(locked.Feed(0xA0,false)==GestureAction.None,"missed lock keys block "+gesture);
+    locked.Reset();
+    Check(locked.Released && locked.Gesture==gesture,"session reset preserves selection for "+gesture);
+    Check(locked.Feed(modifier,false)==GestureAction.None,"late modifier release cannot switch "+gesture);
+    locked.Feed(modifier,true); locked.Feed(0xA0,true);
+    Check(locked.Feed(0xA0,false)==GestureAction.Next,"first gesture after reset works for "+gesture);
+    locked.Reset();
+    Check(locked.Feed(modifier,false)==GestureAction.None,"interrupted cycle cannot commit after reset for "+gesture);
+}
 Console.WriteLine(passed+" checks passed.");
 
 

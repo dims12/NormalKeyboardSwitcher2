@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Threading;
 namespace NormalKeyboardSwitcher2;
@@ -9,7 +10,7 @@ internal sealed class AccessibilityEvents : IDisposable
     [DllImport("user32.dll")] private static extern nint SetWinEventHook(uint first,uint last,nint module,Callback callback,uint process,uint thread,uint flags);
     [DllImport("user32.dll")] private static extern bool UnhookWinEvent(nint hook);
     private readonly Callback callback;
-    private readonly nint focusHook,caretHook;
+    private nint focusHook,caretHook;
     private AccessibleFocus? focus;
     internal AccessibilityEvents(Action wake)
     {
@@ -26,11 +27,22 @@ internal sealed class AccessibilityEvents : IDisposable
         };
         focusHook=SetWinEventHook(0x8005,0x8005,0,callback,0,0,2);
         caretHook=SetWinEventHook(0x11B,0x11B,0,callback,0,0,2);
+        if(focusHook==0 || caretHook==0)
+        {
+            Dispose();
+            throw new Win32Exception("Could not register caret accessibility events.");
+        }
     }
     internal AccessibleFocus? Read(nint foreground)
     {
         var value=Volatile.Read(ref focus);
         return value?.Foreground==foreground ? value:null;
     }
-    public void Dispose() { if(focusHook!=0) UnhookWinEvent(focusHook); if(caretHook!=0) UnhookWinEvent(caretHook); }
+    public void Dispose()
+    {
+        if(focusHook!=0) UnhookWinEvent(focusHook);
+        if(caretHook!=0) UnhookWinEvent(caretHook);
+        focusHook=caretHook=0;
+        Volatile.Write(ref focus,null);
+    }
 }
