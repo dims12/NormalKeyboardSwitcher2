@@ -122,6 +122,18 @@ Check(!CaretInkPolicy.HasStroke(new[]{white},cellBackground),"white empty cell i
 Check(CaretInkPolicy.Choose(new[]{black},cellBackground,0xFFFFFF)==0,"real black caret replaces stale white ink in A1");
 Check(CaretInkPolicy.Background(white,Array.Empty<uint>()).SequenceEqual(white),"left background remains fallback when right side is excluded");
 Check(CaretInkPolicy.Background(new uint[]{0},new uint[]{0xFFFFFF}).Length==0,"insufficient background samples cannot change color");
+uint[] underline={0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0xFFFFFF,0x0000FF,0x0000FF,0x0000FF};
+uint[] textFringe={0xFFFFFF,0xFFFFFF,0xFFFFFF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0x2887FF,0xFFFFFF,0xFFFFFF,0xFFFFFF};
+Check(!CaretInkPolicy.HasStroke(new[]{underline},white),"spell-check underline is not a vertical caret");
+Check(!CaretInkPolicy.HasStroke(new[]{textFringe},white),"orange text fringe does not cover enough caret height");
+Check(CaretInkPolicy.Choose(new[]{textFringe},white,null)==0,"text fringe cannot tint the indicator orange");
+Check(CaretInkPolicy.Choose(new[]{underline,textFringe},white,0)==0,"decorations preserve established black ink");
+uint[] mixedInk={0,0x009000,0x0000FF,0xFFFFFF,0xFFFFFF};
+Check(!CaretInkPolicy.HasStroke(new[]{mixedInk},white),"unrelated contrasting pixels cannot publish a color sample");
+uint[] redCaret={0x0000FF,0x0000FF,0x0000FF,0x0000FF,0x0000FF};
+Check(CaretInkPolicy.HasStroke(new[]{redCaret},white) && CaretInkPolicy.Choose(new[]{redCaret},white,null)==0x0000FF,"genuine red caret is still preserved");
+uint[] interruptedCaret={0,0,0x0000FF,0,0};
+Check(CaretInkPolicy.HasStroke(new[]{interruptedCaret},white) && CaretInkPolicy.Choose(new[]{interruptedCaret},white,null)==0,"caret tolerates a small underline intersection");
 Console.WriteLine(passed+" checks passed.");
 
 

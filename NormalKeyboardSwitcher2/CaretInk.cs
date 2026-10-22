@@ -40,9 +40,9 @@ internal sealed class CaretInk
             for(int col=0;col<Math.Min(width+1,4);col++)
             {
                 var pixels=new List<uint>();
-                for(int row=1;row<=5;row++)
+                for(int row=0;row<height;row++)
                 {
-                    int yy=y+(int)(caret.Height*row/6);
+                    int yy=y+row;
                     uint value=Pixel(x+col,yy);
                     if(value!=uint.MaxValue) pixels.Add(value);
                     if(col==0)
@@ -52,7 +52,9 @@ internal sealed class CaretInk
                         if(right!=uint.MaxValue) rightBackground.Add(right);
                     }
                 }
-                if(pixels.Count>0) columns.Add(pixels.ToArray());
+                // A partially occluded column cannot establish a full-height
+                // stroke: otherwise the remaining text pixels gain extra weight.
+                if(pixels.Count==height) columns.Add(pixels.ToArray());
             }
             var samples=columns.ToArray();
             var surrounding=CaretInkPolicy.Background(leftBackground.ToArray(),rightBackground.ToArray());

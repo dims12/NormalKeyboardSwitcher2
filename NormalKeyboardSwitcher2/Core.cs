@@ -146,22 +146,30 @@ public static class CaretInkPolicy
     {
         if(surroundings.Length==0) return false;
         uint background=surroundings.OrderBy(Luma).ElementAt(surroundings.Length/2);
-        return columns.Any(column => column.Length>=3 && column.Count(p=>Distance(p,background)>120)>=3);
+        return Stroke(columns,background).HasValue;
     }
-    public static uint Choose(uint[][] columns,uint[] surroundings,uint? previous)
+    private static uint? Stroke(uint[][] columns,uint background)
     {
-        if(surroundings.Length==0) return previous??0u;
-        uint background=surroundings.OrderBy(Luma).ElementAt(surroundings.Length/2);
         uint? best=null; double bestDistance=0;
         foreach(var column in columns)
         {
             if(column.Length<3) continue;
             uint color=column.OrderBy(Luma).ElementAt(column.Length/2);
             double distance=Distance(color,background);
-            // Require a vertical stroke; one letter pixel is not evidence of caret ink.
-            if(distance>120 && distance>bestDistance && column.Count(p=>Distance(p,color)<60)>=3)
+            // Samples span the full caret height. Text stems, subpixel fringes,
+            // and spell-check underlines cover only part of that height.
+            int required=Math.Max(3,(int)Math.Ceiling(column.Length*0.8));
+            if(distance>120 && distance>bestDistance && column.Count(p=>Distance(p,color)<60)>=required)
             { best=color; bestDistance=distance; }
         }
+        return best;
+    }
+    public static uint Choose(uint[][] columns,uint[] surroundings,uint? previous)
+    {
+        if(surroundings.Length==0) return previous??0u;
+        uint background=surroundings.OrderBy(Luma).ElementAt(surroundings.Length/2);
+        uint? best=Stroke(columns,background);
+        double bestDistance=best.HasValue ? Distance(best.Value,background) : 0;
         // Anti-aliased/blinking carets can produce lighter samples at the same
         // position. Preserve the stronger ink while it contrasts with the surface.
         // A theme/background change invalidates this naturally through contrast.
