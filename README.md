@@ -2,6 +2,10 @@
 
 A Windows desktop language switcher with Alt+Tab-style recently used ordering and a language badge beside the text caret. Successor to NormalKeyboardSwitcher; the old source is unchanged.
 
+Especially useful when you have more than two input languages installed: quickly toggle between your two most recently used languages, or keep holding the modifier and tap Shift to cycle through the others.
+
+![French language indicator beside the text caret in Notepad](docs/images/notepad-language-indicator.png)
+
 ## Build and run
 
 Open `NormalKeyboardSwitcher2.sln` in JetBrains Rider. Requires Windows x64 and the .NET 10 SDK (already installed on the development machine).
