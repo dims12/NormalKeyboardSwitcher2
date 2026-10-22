@@ -1,0 +1,50 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'NormalKeyboardSwitcher2/**'
+      - 'NormalKeyboardSwitcher2.Tests/**'
+      - 'NormalKeyboardSwitcher2.sln'
+      - 'global.json'
+      - 'packaging/windows/**'
+      - 'scripts/**'
+      - '.github/workflows/windows-installer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install pinned compiler
+        shell: pwsh
+        run: ./scripts/Install-InnoSetup.ps1
+      - name: Build installer and run regression checks
+        shell: pwsh
+        run: ./scripts/Build-WindowsInstaller.ps1 -InnoCompiler ./artifacts/tools/InnoSetup/ISCC.exe
+      - name: Exercise installation and removal
+        shell: pwsh
+        run: ./scripts/Test-WindowsInstaller.ps1 -Installer ./artifacts/installer/NormalKeyboardSwitcher2-0.1.0-win-x64-setup.exe
+      - name: Upload installer and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: NormalKeyboardSwitcher2-win-x64-installer
+          path: artifacts/installer/*
+          if-no-files-found: error
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-test-logs
+          path: |
+            artifacts/installer-smoke/**/*.log
+            artifacts/installer-smoke/**/*.png
+          if-no-files-found: ignore

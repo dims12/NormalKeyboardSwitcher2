@@ -35,6 +35,23 @@ internal sealed class App : Application
     [STAThread]
     public static int Main(string[] args)
     {
+        if(args.Length==1 && args[0]=="--uninstall-cleanup")
+        {
+            using var guard=new Mutex(true,@"Local\NormalKeyboardSwitcher2",out bool acquired);
+            if(!acquired) return 2;
+            try
+            {
+                WindowsShortcut.Restore();
+                StartupRegistration.RemoveIfOwned();
+                return 0;
+            }
+            catch(Exception ex)
+            {
+                AppLog.Write("Uninstall cleanup: "+ex);
+                return 1;
+            }
+            finally { guard.ReleaseMutex(); }
+        }
         if(args.Length==3 && (args[0]=="--console-caret" || args[0]=="--console-probe") && uint.TryParse(args[1],out uint consoleProcess))
         {
             ConsoleCaretWorker.Run(consoleProcess,args[2],args[0]=="--console-probe");

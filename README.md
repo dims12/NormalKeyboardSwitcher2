@@ -8,6 +8,14 @@ Especially useful when you have more than two input languages installed: quickly
 
 See the [roadmap](ROADMAP.md) for native Windows and Linux integration plans. The indicator beside the caret is a core requirement on every supported platform.
 
+## Install on Windows
+
+The Windows x64 installer includes the .NET runtime and installs for the current user without administrator privileges. Download the installer artifact from a successful [Windows installer build](https://github.com/dims12/NormalKeyboardSwitcher2/actions/workflows/windows-installer.yml), extract it, and run the setup executable. Windows 10 22H2 or later is required; ARM64 is not currently packaged. The installer is unsigned.
+
+Exit the switcher from its tray menu before upgrading or uninstalling. Launch it from the Start menu, choose your settings, and press **OK**. Enable **Start with Windows** in settings if desired. Uninstalling retains your preferences for a later reinstall.
+
+See [installer build and validation instructions](packaging/windows/README.md) to build your own setup executable.
+
 ## Build and run
 
 Open `NormalKeyboardSwitcher2.sln` in JetBrains Rider. Requires Windows x64 and the .NET 10 SDK.

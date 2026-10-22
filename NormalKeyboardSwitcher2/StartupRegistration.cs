@@ -35,4 +35,11 @@ internal static class StartupRegistration
         }
         else key.DeleteValue(ValueName, false);
     }
+
+    internal static void RemoveIfOwned()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable:true);
+        if (string.Equals(key?.GetValue(ValueName) as string, Command, StringComparison.OrdinalIgnoreCase))
+            key!.DeleteValue(ValueName, false);
+    }
 }
