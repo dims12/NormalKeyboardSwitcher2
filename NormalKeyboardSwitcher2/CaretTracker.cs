@@ -67,18 +67,21 @@ internal sealed class CaretTracker : IDisposable
                 }
                 var gui = Native.Gui();
                 PixelRect? rect = null;
-                string method = "UI Automation";
+                string method = "MSAA caret";
                 var trace=new List<string>();
+                // An explicit caret object is more precise than a text-range
+                // approximation. Chrome's address bar can report its field origin
+                // for a collapsed UIA selection even while the real caret moves.
                 // A transient provider error must not kill tracking for all applications.
-                try { rect = AutomationCaret(automation,trace); }
+                try { rect = AccessibleCaret(gui.Focus); }
                 catch (Exception ex) when (ex is COMException or InvalidCastException or ArgumentException)
-                { trace.Add("UIA error "+ex.HResult.ToString("X")); }
+                { trace.Add("MSAA error "+ex.HResult.ToString("X")); }
                 if (rect == null)
                 {
-                    method = "MSAA caret";
-                    try { rect = AccessibleCaret(gui.Focus); }
+                    method = "UI Automation";
+                    try { rect = AutomationCaret(automation,trace); }
                     catch (Exception ex) when (ex is COMException or InvalidCastException or ArgumentException)
-                    { trace.Add("MSAA error "+ex.HResult.ToString("X")); }
+                    { trace.Add("UIA error "+ex.HResult.ToString("X")); }
                 }
                 if(rect==null)
                 {
