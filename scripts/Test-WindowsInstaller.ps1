@@ -46,6 +46,13 @@ function Install-Package([string]$File, [string]$LogName) {
 function Uninstall-Package([string]$LogName) {
     $code = Run-Process $uninstaller ($common + @("/LOG=`"$testRoot\$LogName.log`""))
     if ($code -ne 0) { throw "Uninstallation failed: $code" }
+    # Inno's helper can delete the uninstaller after its main process exits.
+    # Wait for that cleanup before reinstalling into the same directory.
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    while ((Test-Path -LiteralPath $installDir) -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (Test-Path -LiteralPath $installDir) { throw 'Uninstaller cleanup did not finish.' }
     if ((Test-Path -LiteralPath $app) -or (Test-Path $uninstallKey)) { throw 'Uninstallation left application registration or executable behind.' }
 }
 
