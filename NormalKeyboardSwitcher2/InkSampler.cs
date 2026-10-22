@@ -19,9 +19,7 @@ internal sealed class InkSampler : IDisposable
     internal Color Read(PixelRect caret,PixelRect overlay)
     {
         nint window=Native.GetForegroundWindow();
-        // A provider's one-pixel placeholder is not a text caret. Sampling it
-        // mistakes grid lines or our own nearby label for a blinking stroke.
-        Volatile.Write(ref request,caret.Height>=4 ? new(window,caret,overlay) : null);
+        Volatile.Write(ref request,new(window,caret,overlay));
         var cached=Volatile.Read(ref result);
         return cached?.Window==window ? cached.Color : Colors.Black;
     }
@@ -36,7 +34,10 @@ internal sealed class InkSampler : IDisposable
                 try
                 {
                     var sample=ink.Read(target.Caret,target.Overlay);
-                    if(sample.Visible==true && Native.GetForegroundWindow()==target.Window)
+                    // Publish a readable background fallback even when the caret
+                    // is blinking off or only exposes placeholder geometry.
+                    if(sample.Reliable && Native.GetForegroundWindow()==target.Window &&
+                        target==Volatile.Read(ref request))
                         Volatile.Write(ref result,new(target.Window,sample.Color));
                 }
                 catch(Exception ex) when(ex is System.Runtime.InteropServices.ExternalException or ArgumentException) { }

@@ -164,21 +164,13 @@ public static class CaretInkPolicy
         }
         return best;
     }
-    public static uint Choose(uint[][] columns,uint[] surroundings,uint? previous)
+    public static uint Choose(uint[][] columns,uint[] surroundings)
     {
-        if(surroundings.Length==0) return previous??0u;
+        if(surroundings.Length==0) return 0u;
         uint background=surroundings.OrderBy(Luma).ElementAt(surroundings.Length/2);
         uint? best=Stroke(columns,background);
-        double bestDistance=best.HasValue ? Distance(best.Value,background) : 0;
-        // Anti-aliased/blinking carets can produce lighter samples at the same
-        // position. Preserve the stronger ink while it contrasts with the surface.
-        // A theme/background change invalidates this naturally through contrast.
-        if(previous.HasValue && Distance(previous.Value,background)>180 &&
-            (!best.HasValue || Distance(previous.Value,background)>=bestDistance))
-            return previous.Value;
         if(best.HasValue) return best.Value;
-        // Preserve a colored caret during its blink-off phase only if it still contrasts.
-        if(previous.HasValue && Distance(previous.Value,background)>180) return previous.Value;
+        // Every location stands on its own, including the first blink-off frame.
         return Luma(background)>=140 ? 0u : 0xFFFFFFu;
     }
 }

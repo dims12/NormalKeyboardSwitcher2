@@ -11,7 +11,7 @@ internal sealed class OutlinedLabel : FrameworkElement
     private string text = "";
     private Color color = Colors.Black;
     private Brush fill = Brushes.Black;
-    private Pen outline = MakeOutline(Colors.Black);
+    private Brush outline = Brushes.White;
     internal OutlinedLabel()
     {
         TextOptions.SetTextRenderingMode(this,TextRenderingMode.Grayscale);
@@ -29,29 +29,32 @@ internal sealed class OutlinedLabel : FrameworkElement
         var brush = new SolidColorBrush(value);
         brush.Freeze();
         fill = brush;
-        outline = MakeOutline(value);
+        outline = Outline(value);
         InvalidateVisual();
     }
-    private static Pen MakeOutline(Color value)
+    private static Brush Outline(Color value)
     {
         double luminance = 0.2126 * value.R + 0.7152 * value.G + 0.0722 * value.B;
-        var pen = new Pen(luminance < 128 ? Brushes.White : Brushes.Black, 1.0)
-        { LineJoin = PenLineJoin.Round };
-        pen.Freeze();
-        return pen;
+        return luminance < 128 ? Brushes.White : Brushes.Black;
     }
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
         if (text.Length == 0) return;
-        var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+        var dpi=VisualTreeHelper.GetDpi(this);
+        FormattedText Format(Brush brush) => new(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            9, fill, VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        double scale=VisualTreeHelper.GetDpi(this).DpiScaleY;
+            9, brush, null, TextFormattingMode.Display, dpi.PixelsPerDip);
+        var formatted=Format(fill);
+        var halo=Format(outline);
+        double scale=dpi.DpiScaleY;
         var origin=new Point(2, Math.Round(Math.Max(0,(ActualHeight-formatted.Height)/2)*scale)/scale);
-        var geometry = formatted.BuildGeometry(origin);
-        // Paint the halo first, then fill to keep the original glyph strokes intact.
-        drawingContext.DrawGeometry(null, outline, geometry);
+        // Use the same hinted glyphs for both layers. A vector outline and
+        // DrawText disagree at small sizes, leaving broken-looking letter edges.
+        for(int y=-1;y<=1;y++)
+            for(int x=-1;x<=1;x++)
+                if(x!=0 || y!=0)
+                    drawingContext.DrawText(halo,new Point(origin.X+x/dpi.DpiScaleX,origin.Y+y/scale));
         drawingContext.DrawText(formatted,origin);
     }
 }
