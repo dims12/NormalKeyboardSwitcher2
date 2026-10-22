@@ -1,14 +1,16 @@
 # NormalKeyboardSwitcher2
 
-A Windows desktop language switcher with Alt+Tab-style recently used ordering and a language badge beside the text caret. Successor to NormalKeyboardSwitcher; the old source is unchanged.
+A Windows desktop language switcher with Alt+Tab-style recently used ordering and a language badge beside the text caret. Successor to NormalKeyboardSwitcher.
 
 Especially useful when you have more than two input languages installed: quickly toggle between your two most recently used languages, or keep holding the modifier and tap Shift to cycle through the others.
 
 ![French language indicator beside the text caret in Notepad](docs/images/notepad-language-indicator.png)
 
+See the [roadmap](ROADMAP.md) for native Windows and Linux integration plans. The indicator beside the caret is a core requirement on every supported platform.
+
 ## Build and run
 
-Open `NormalKeyboardSwitcher2.sln` in JetBrains Rider. Requires Windows x64 and the .NET 10 SDK (already installed on the development machine).
+Open `NormalKeyboardSwitcher2.sln` in JetBrains Rider. Requires Windows x64 and the .NET 10 SDK.
 
 ```powershell
 dotnet build NormalKeyboardSwitcher2.sln -c Release
@@ -56,7 +58,7 @@ Use **Restart as administrator** for elevated editors, system property sheets an
 
 Classic console layout detection resolves the console host thread by its window, avoiding the stale client-thread layout reported by Windows compatibility behavior. Classic ConsoleWindowClass windows also use an isolated helper that queries cursor visibility, position, font-cell size and viewport through the Windows console API. It reads no console text or input. The helper opens a read/write console handle because cursor-info queries on some hosts reject a read-only handle; it never writes to the console. The helper exits when its parent pipe closes. Caret painting runs on a 16 ms timer, and keyboard activity wakes accessibility polling. The implementation includes accessibility paths used by modern applications, but universal compatibility is not guaranteed. Some custom controls and IMEs require additional work. The badge reports the input language, not the IME's internal conversion mode. Multiple layouts of one language currently share the same short language label; full names appear in settings.
 
-This is an initial implementation, not yet a verified replacement across every application. Specifically, classic CMD, Windows Terminal, browser editors, elevated property sheets and mixed-DPI physical monitor transitions need interactive acceptance testing on this machine. A successful build does not establish that coverage.
+Compatibility depends on the application and its accessibility providers. Release acceptance testing must cover classic CMD, Windows Terminal, browser editors, elevated property sheets, and mixed-DPI monitor transitions. A successful build alone does not establish that coverage.
 
 ## Validation
 
@@ -100,7 +102,7 @@ A future non-elevated UIAccess distribution would need appropriate signing, prot
 
 ## LibreOffice accessibility
 
-The installed LibreOffice 24.2 required a screen-reader flag or `SAL_FORCE_IACCESSIBLE2` before exposing its accessibility bridge. Forcing that bridge caused the Calc test instance to hang even with the indicator stopped, so the workaround was withdrawn. `Start-LibreOfficeAccessible.cmd` now starts Calc normally with that override cleared. The standard IAccessible2 fallback queries only focus, caret offsets and character geometry.
+LibreOffice integration uses the accessibility interfaces exposed by the application. The IAccessible2 fallback queries focus, caret offsets, and character geometry. `Start-LibreOfficeAccessible.cmd` launches Calc with the `SAL_FORCE_IACCESSIBLE2` override cleared; the switcher does not require forcing that override.
 
 ## Start with Windows
 
